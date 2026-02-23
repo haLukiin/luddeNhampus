@@ -2,49 +2,65 @@ using UnityEngine;
 
 public class playerScript : MonoBehaviour
 {
-    public float moveSpeed = 6f;
-    public float jumpForce = 12f;
+    [Header("Auto Drive")]
+    public float acceleration = 30f;
+    public float maxSpeed = 15f;
+
+    [Header("Air Control")]
+    public float airTorque = 10f;
+
+    [Header("Wheels")]
+    public Transform frontWheel;
+    public Transform backWheel;
 
     private Rigidbody2D rb;
-    private bool isGrounded;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
     }
 
-    void Update()
+    void FixedUpdate()
     {
-        float moveInput = 0f;
-
-        if (Input.GetKey(KeyCode.A))
-            moveInput = -1f;
-
-        if (Input.GetKey(KeyCode.D))
-            moveInput = 1f;
-
-        rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
-
-        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
+        // Auto move right
+        if (rb.linearVelocity.x < maxSpeed)
         {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            rb.AddForce(Vector2.right * acceleration);
         }
     }
 
-    void OnCollisionStay2D(Collision2D collision)
+    void Update()
     {
-        if (collision.gameObject.layer == LayerMask.NameToLayer("Ground"))
-        {
-            foreach (ContactPoint2D contact in collision.contacts)
-            {
-                if (contact.normal.y > 0.5f)
-                {
-                    isGrounded = true;
-                    return;
-                }
-            }
-        }
+        HandleAirControl();
+        RotateWheels();
+    }
 
-        isGrounded = false;
+    void HandleAirControl()
+    {
+        if (!IsGrounded())
+        {
+            if (Input.GetKey(KeyCode.A))
+                rb.AddTorque(airTorque);
+
+            if (Input.GetKey(KeyCode.D))
+                rb.AddTorque(-airTorque);
+        }
+    }
+
+    void RotateWheels()
+    {
+        float spinSpeed = rb.linearVelocity.x * 50f * Time.deltaTime;
+
+        if (frontWheel != null)
+            frontWheel.Rotate(0, 0, -spinSpeed);
+
+        if (backWheel != null)
+            backWheel.Rotate(0, 0, -spinSpeed);
+    }
+
+    bool IsGrounded()
+    {
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, 1f);
+        return hit.collider != null;
     }
 }
