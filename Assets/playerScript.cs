@@ -1,41 +1,42 @@
 using UnityEngine;
-
-
-
-
-using UnityEngine;
 using System.Collections;
 
 public class CarController : MonoBehaviour
 {
-    [Header("Auto Drive")]
+    
     public float acceleration = 30f;
     public float maxSpeed = 15f;
 
-    [Header("Air Control")]
+   
     public float airTorque = 10f;
 
-    [Header("Wheels")]
+   
     public Transform frontWheel;
     public Transform backWheel;
 
-    [Header("Body & Explosion")]
-    public GameObject carBody;       // Drag the Body child object here
-    public ParticleSystem explosion; // Drag the explosion ParticleSystem here
-    public float explosionDuration = 2f; // How long the explosion should last before ending
+    
+    public GameObject carBody;       
+    public ParticleSystem explosion; 
+    public float explosionDuration = 2f; 
 
-    [Header("Crash Settings")]
-    public float crashRotationThreshold = 120f; // Degrees to detect upside-down
-    public string groundTag = "Ground";         // Tag for the Tilemap ground
+    
+    public float crashRotationThreshold = 120f; 
+    public string groundTag = "Ground";        
+
+    [Header("Landing Boost")]
+    public float landingBoostForce = 150f;
+    public float minAirTimeForBoost = 0.2f; // Minimum seconds airborne before boost triggers
 
     private Rigidbody2D rb;
     private bool isDestroyed = false;
+    private bool wasGrounded = true;
+    private float airTime = 0f;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
 
-        // Make wheels kinematic at start so they don't interfere with ground
+       
         SetWheelKinematic(frontWheel);
         SetWheelKinematic(backWheel);
     }
@@ -47,6 +48,10 @@ public class CarController : MonoBehaviour
         // Auto move right
         if (rb.linearVelocity.x < maxSpeed)
             rb.AddForce(Vector2.right * acceleration);
+
+        // Track airtime while off the ground
+        if (!wasGrounded)
+            airTime += Time.fixedDeltaTime;
     }
 
     void Update()
@@ -59,7 +64,7 @@ public class CarController : MonoBehaviour
 
     void HandleAirControl()
     {
-        if (!IsGrounded())
+        if (!wasGrounded)
         {
             if (Input.GetKey(KeyCode.A))
                 rb.AddTorque(airTorque);
@@ -88,13 +93,25 @@ public class CarController : MonoBehaviour
 
         if (!collision.gameObject.CompareTag(groundTag)) return;
 
+        // Apply landing boost if airborne long enough
+        if (!wasGrounded && airTime >= minAirTimeForBoost)
+            rb.AddForce(Vector2.right * landingBoostForce, ForceMode2D.Impulse);
+
+        airTime = 0f;
+        wasGrounded = true;
+
         float z = transform.eulerAngles.z;
         if (z > 180f) z -= 360f;
 
         if (Mathf.Abs(z) > crashRotationThreshold)
-        {
             Explode();
-        }
+    }
+
+    void OnCollisionExit2D(Collision2D collision)
+    {
+        if (!collision.gameObject.CompareTag(groundTag)) return;
+
+        wasGrounded = false;
     }
 
     void Explode()
