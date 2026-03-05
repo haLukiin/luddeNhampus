@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using System.Collections;
 
 
@@ -20,11 +21,15 @@ public class CarController : MonoBehaviour
     public float crashRotationThreshold = 120f;
     public string groundTag = "Ground";
 
+    [Header("Gravity")]
+    public float groundedGravityScale = 4f;
+    public float airGravityScale = 2f;
+
     [Header("Landing Boost")]
-    public float landingBoostForce = 150f;
+    public float landingBoostForce = 80f;
     public float minAirTimeForBoost = 0.2f;
 
-    [Header("Flip Boost")]
+    [Header("Flip Scoring")]
     public float frontFlipBoostBonus = 15f;
     public float backFlipBoostBonus = 10f;
     public float partialFlipBoostBonus = 5f;
@@ -48,6 +53,7 @@ public class CarController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        rb.gravityScale = groundedGravityScale;
         SetWheelKinematic(frontWheel);
         SetWheelKinematic(backWheel);
     }
@@ -71,33 +77,26 @@ public class CarController : MonoBehaviour
                 OnFlipCompleted?.Invoke(currentFlips);
             }
         }
+
+        HandleAirControl();
     }
 
     void Update()
     {
         if (isDestroyed) return;
-
-        HandleAirControl();
-        RotateWheels();
     }
 
     void HandleAirControl()
     {
         if (!wasGrounded)
         {
-            if (Input.GetKey(KeyCode.A))
-                rb.AddTorque(airTorque);
+            float input = 0f;
+            if (Keyboard.current.aKey.isPressed) input =  1f;
+            if (Keyboard.current.dKey.isPressed) input = -1f;
 
-            if (Input.GetKey(KeyCode.D))
-                rb.AddTorque(-airTorque);
+            if (input != 0f)
+                rb.AddTorque(input * airTorque);
         }
-    }
-
-    void RotateWheels()
-    {
-        float spinSpeed = rb.linearVelocity.x * 50f * Time.deltaTime;
-        if (frontWheel != null) frontWheel.Rotate(0, 0, -spinSpeed);
-        if (backWheel != null) backWheel.Rotate(0, 0, -spinSpeed);
     }
 
     void OnCollisionEnter2D(Collision2D collision)
@@ -123,17 +122,12 @@ public class CarController : MonoBehaviour
         {
             Explode();
             return;
-        }
-
-        OnLanding?.Invoke(frontFlips, backFlips, partialRatio);
-
-        float boostForce = landingBoostForce
-            + frontFlips * frontFlipBoostBonus
-            + backFlips  * backFlipBoostBonus
-            + partialRatio * partialFlipBoostBonus;
+        }        OnLanding?.Invoke(frontFlips, backFlips, partialRatio);
 
         if (airTime >= minAirTimeForBoost)
-            rb.AddForce(Vector2.right * boostForce, ForceMode2D.Impulse);
+            rb.AddForce(Vector2.right * landingBoostForce, ForceMode2D.Impulse);
+
+        rb.gravityScale = groundedGravityScale;
     }
 
     void OnCollisionExit2D(Collision2D collision)
@@ -142,6 +136,7 @@ public class CarController : MonoBehaviour
         wasGrounded = false;
         airRotationAccumulator = 0f;
         lastFlipCount = 0;
+        rb.gravityScale = airGravityScale;
     }
 
     void Explode()
@@ -232,5 +227,3 @@ public class CarController : MonoBehaviour
         wheel.position = new Vector3(wheel.position.x, wheel.position.y + 0.1f, wheel.position.z);
     }
 }
-
-
