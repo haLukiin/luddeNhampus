@@ -1,6 +1,7 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GameHUD : MonoBehaviour
 {
@@ -10,28 +11,36 @@ public class GameHUD : MonoBehaviour
     public TextMeshProUGUI comboLabel;
     public float comboFadeDuration = 1.5f;
 
+    [Header("Gas")]
+    public Image gasFillImage;
+
     private Coroutine comboFadeCoroutine;
     private CarController carController;
 
     void Start()
     {
-        if (ScoreManager.Instance == null) return;
-
-        ScoreManager.Instance.OnDistanceChanged += OnDistanceChanged;
-        ScoreManager.Instance.OnScoreChanged    += OnScoreChanged;
-        ScoreManager.Instance.OnComboChanged    += OnComboChanged;
-
-        if (ScoreManager.Instance.playerTransform != null)
+        if (ScoreManager.Instance != null)
         {
-            carController = ScoreManager.Instance.playerTransform.GetComponent<CarController>();
-            if (carController != null)
-                carController.OnCrash += OnCrash;
+            ScoreManager.Instance.OnDistanceChanged += OnDistanceChanged;
+            ScoreManager.Instance.OnScoreChanged    += OnScoreChanged;
+            ScoreManager.Instance.OnComboChanged    += OnComboChanged;
+
+            if (ScoreManager.Instance.playerTransform != null)
+            {
+                carController = ScoreManager.Instance.playerTransform.GetComponent<CarController>();
+                if (carController != null)
+                    carController.OnCrash += OnCrash;
+            }
         }
 
         if (distanceLabel  != null) distanceLabel.text  = "0 m";
         if (scoreLabel     != null) scoreLabel.text     = "Score: 0";
-        if (highScoreLabel != null) highScoreLabel.text = $"Best: {ScoreManager.Instance.HighScore}";
+        if (highScoreLabel != null) highScoreLabel.text = $"Best: {ScoreManager.Instance?.HighScore}";
         if (comboLabel     != null) comboLabel.alpha    = 0f;
+        if (gasFillImage   != null) gasFillImage.fillAmount = 1f;
+
+        if (GasManager.Instance != null)
+            GasManager.Instance.OnGasChanged += OnGasChanged;
     }
 
     void OnDestroy()
@@ -45,6 +54,9 @@ public class GameHUD : MonoBehaviour
 
         if (carController != null)
             carController.OnCrash -= OnCrash;
+
+        if (GasManager.Instance != null)
+            GasManager.Instance.OnGasChanged -= OnGasChanged;
     }
 
     private void OnDistanceChanged(float distance)
@@ -73,6 +85,16 @@ public class GameHUD : MonoBehaviour
             StopCoroutine(comboFadeCoroutine);
 
         comboFadeCoroutine = StartCoroutine(FadeComboLabel());
+    }
+
+    private void OnGasChanged(float normalizedGas)
+    {
+        if (gasFillImage == null) return;
+
+        gasFillImage.fillAmount = normalizedGas;
+        gasFillImage.color = normalizedGas < 0.25f
+            ? Color.Lerp(Color.red, Color.yellow, normalizedGas / 0.25f)
+            : Color.green;
     }
 
     private IEnumerator FadeComboLabel()
